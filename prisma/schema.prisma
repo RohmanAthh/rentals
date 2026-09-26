@@ -1,0 +1,167 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CUSTOMER
+  ADMIN
+}
+
+enum VehicleStatus {
+  AVAILABLE
+  MAINTENANCE
+  RENTED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  ONGOING
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CREDIT_CARD
+  TRANSFER
+  EWALLET
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+model User {
+  id        String   @id @default(uuid()) @db.Uuid
+  email     String   @unique
+  password  String
+  name      String
+  phone     String
+  role      Role     @default(CUSTOMER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  bookings      Booking[]
+  reviews       Review[]
+  notifications Notification[]
+
+  @@map("users")
+}
+
+model VehicleCategory {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @unique
+  description String?
+
+  vehicles Vehicle[]
+
+  @@map("vehicle_categories")
+}
+
+model Vehicle {
+  id               String        @id @default(uuid()) @db.Uuid
+  categoryId       String        @db.Uuid
+  brand            String
+  model            String
+  licensePlate     String        @unique
+  year             Int
+  pricePerDay      Decimal       @db.Decimal(10, 2)
+  seatingCapacity  Int
+  transmission     String
+  fuelType         String
+  status           VehicleStatus @default(AVAILABLE)
+  deletedAt        DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  category VehicleCategory @relation(fields: [categoryId], references: [id])
+  images   VehicleImage[]
+  bookings Booking[]
+  reviews  Review[]
+
+  @@map("vehicles")
+}
+
+model VehicleImage {
+  id        String  @id @default(uuid()) @db.Uuid
+  vehicleId String  @db.Uuid
+  url       String
+  isPrimary Boolean @default(false)
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id])
+
+  @@map("vehicle_images")
+}
+
+model Booking {
+  id         String        @id @default(uuid()) @db.Uuid
+  userId     String        @db.Uuid
+  vehicleId  String        @db.Uuid
+  startDate  DateTime
+  endDate    DateTime
+  totalPrice Decimal       @db.Decimal(10, 2)
+  status     BookingStatus @default(PENDING)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  user    User      @relation(fields: [userId], references: [id])
+  vehicle Vehicle   @relation(fields: [vehicleId], references: [id])
+  payment Payment?
+  review  Review?
+
+  @@index([vehicleId, startDate, endDate], name: "idx_bookings_vehicle_dates")
+  @@index([userId], name: "idx_bookings_user_id")
+  @@map("bookings")
+}
+
+model Payment {
+  id            String        @id @default(uuid()) @db.Uuid
+  bookingId     String        @unique @db.Uuid
+  amount        Decimal       @db.Decimal(10, 2)
+  method        PaymentMethod
+  status        PaymentStatus @default(PENDING)
+  transactionId String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  booking Booking @relation(fields: [bookingId], references: [id])
+
+  @@map("payments")
+}
+
+model Review {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  vehicleId String   @db.Uuid
+  bookingId String   @unique @db.Uuid
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id])
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id])
+  booking Booking @relation(fields: [bookingId], references: [id])
+
+  @@map("reviews")
+}
+
+model Notification {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("notifications")
+}
